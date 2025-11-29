@@ -14,6 +14,10 @@ st.set_page_config(
     layout="wide"
 )
 
+# Custom avatar configuration
+USER_AVATAR = "👤"  # User icon
+ASSISTANT_AVATAR = "🤖"  # Robot/AI icon
+
 # API Configurations
 BOOKS_API_URL = "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/IWConnect/Hackathon/RetriveAllBooksTask"
 BOOKS_API_TOKEN = "eNBKWJ5rIaphA2tRzQVacKRCU4BJwjHQ"
@@ -22,7 +26,7 @@ CHAT_API_TOKEN = "nnWP8mDzAw80OfTDgxyp5WPBSQXj2659"
 
 
 # === ULTRA-FAST 3-LAYER CACHING SYSTEM ===
-@st.cache_data(ttl=3600, show_spinner=False)  # 1 HOUR CACHE - NO SPINNER
+@st.cache_data(ttl=3600, show_spinner=False)
 def fetch_books_from_api():
     """ULTRA-FAST book fetching with optimized processing"""
     start_time = time.time()
@@ -38,14 +42,11 @@ def fetch_books_from_api():
             data = response.json()
             books = data if isinstance(data, list) else data.get("books", data.get("data", data.get("items", [])))
 
-            # 🚀 ULTRA-FAST PROCESSING (SIMPLIFIED)
             formatted_books = []
             for i, book in enumerate(books):
                 if isinstance(book, dict):
-                    # ⚡ SUPER FAST GENRE DETECTION
                     genre = "Fiction"
 
-                    # Direct field checks (no loops)
                     if book.get("genre"):
                         genre = str(book["genre"]).strip()
                     elif book.get("category"):
@@ -53,7 +54,6 @@ def fetch_books_from_api():
                     elif book.get("bookGenre"):
                         genre = str(book["bookGenre"]).strip()
                     else:
-                        # Fast title-based detection
                         title_lower = str(book.get("title", "")).lower()
                         if any(kw in title_lower for kw in ["mystery", "crime", "thriller"]):
                             genre = "Mystery"
@@ -83,7 +83,6 @@ def fetch_books_from_api():
         return []
 
 
-# === SEPARATE IMAGE CACHE - 2 HOURS ===
 @st.cache_data(ttl=7200, show_spinner=False, max_entries=200)
 def load_single_image(image_url):
     """Dedicated image cache - separate from books"""
@@ -97,7 +96,6 @@ def load_single_image(image_url):
     return None
 
 
-# === PRE-COMPUTED GENRE CACHE ===
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_genres_and_counts(books_data):
     """Pre-compute genres for instant filtering"""
@@ -114,7 +112,6 @@ def get_genres_and_counts(books_data):
     return display_genres
 
 
-# === LIGHTNING-FAST BOOK LOADING ===
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_books():
     """Final cached books with ALL pre-computations"""
@@ -123,7 +120,6 @@ def get_books():
     return books, genres
 
 
-# === INITIAL LOAD - ULTRA-FAST ===
 books_data, genre_list = get_books()
 
 # === SESSION STATE ===
@@ -133,7 +129,6 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 
-# === Add book to cart ===
 def add_book_to_cart(book_info):
     title = book_info.get('title', 'Unknown Book')
     book_id = book_info.get('id')
@@ -158,31 +153,47 @@ def add_book_to_cart(book_info):
     return f"✅ **{title}** added to cart!"
 
 
-# === Chat API ===
+# === FIXED CHAT API - PROPER MESSAGE HANDLING ===
 def chat_with_backend_api(current_message: str, chat_history: list, cart: list):
+    """
+    Fixed version that properly handles chat history
+    """
     try:
         headers = {
             "Authorization": f"Bearer {CHAT_API_TOKEN}",
             "Content-Type": "application/json"
         }
 
+        # ✅ FIX: Properly build messages array from chat history
         messages_array = []
-        for i in range(0, len(chat_history), 2):
-            if i < len(chat_history):
-                messages_array.append({"role": "user", "content": chat_history[i]["content"]})
-            if i + 1 < len(chat_history):
-                messages_array.append({"role": "assistant", "content": chat_history[i + 1]["content"]})
 
-        messages_array.append({"role": "user", "content": current_message})
+        # Add all previous messages in order (they already have correct roles)
+        for msg in chat_history:
+            # Only include user and assistant messages, skip the books data
+            messages_array.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
+
+        # Add the current user message
+        messages_array.append({
+            "role": "user",
+            "content": current_message
+        })
 
         payload = {
             "messages": messages_array,
             "cart": [{"title": item["title"], "quantity": item.get("quantity", 1)} for item in cart]
         }
 
+        # Debug: Print what we're sending
+        print(f"📤 Sending {len(messages_array)} messages to backend")
+        print(f"📤 Last 3 messages: {messages_array[-3:] if len(messages_array) >= 3 else messages_array}")
+
         response = requests.post(CHAT_API_URL, headers=headers, json=payload, timeout=30)
 
         if response.status_code != 200:
+            print(f"❌ API Error: {response.status_code}")
             return {
                 "response": "I'm having trouble connecting to the book catalog. I can still chat about books though!",
                 "books": []
@@ -192,6 +203,7 @@ def chat_with_backend_api(current_message: str, chat_history: list, cart: list):
         response_text = "I'm here to help you find great books!"
         books_list = []
 
+        # Parse response
         if isinstance(data, list) and len(data) > 0:
             first_item = data[0]
             if isinstance(first_item, dict) and "response" in first_item:
@@ -217,19 +229,44 @@ def chat_with_backend_api(current_message: str, chat_history: list, cart: list):
                 response_text = data.get("response", response_text)
                 books_list = data.get("books", [])
 
+        print(f"✅ Received response with {len(books_list)} books")
+
         return {
             "response": str(response_text),
             "books": books_list
         }
 
-    except:
+    except Exception as e:
+        print(f"❌ Chat API Exception: {e}")
         return {
             "response": "I'm having a moment! 😅 Tell me what kind of books you're looking for!",
             "books": []
         }
 
 
-# === Book cards in chat ===
+# === ANIMATED TEXT DISPLAY ===
+def stream_text(text, placeholder):
+    """
+    Creates a typing animation effect
+    """
+    displayed_text = ""
+    words = text.split()
+
+    # Stream word by word for smooth effect
+    for i, word in enumerate(words):
+        displayed_text += word + " "
+        placeholder.markdown(displayed_text)
+
+        # Adjust speed: faster for short words, slower for long ones
+        if len(word) > 8:
+            time.sleep(0.08)
+        else:
+            time.sleep(0.05)
+
+    # Final update with complete text
+    placeholder.markdown(text)
+
+
 def display_book_cards_in_chat(books, message_index):
     if not books:
         return
@@ -298,17 +335,15 @@ with st.sidebar:
 
 tab1, tab2, tab3 = st.tabs(["📚 Browse", "🛒 Cart", "💬 AI Assistant"])
 
-# === ULTRA-FAST BROWSE TAB ===
+# === BROWSE TAB ===
 with tab1:
     st.header("🔍 Browse Books")
 
     if not books_data:
         st.info("📚 No books available. Click 'Refresh Books' in sidebar to try again.")
     else:
-        # ✅ PRE-COMPUTED GENRES - INSTANT!
         display_genres = genre_list
 
-        # Filters
         col1, col2, col3 = st.columns([3, 2, 2])
         with col1:
             search = st.text_input("🔍 Search by title or author")
@@ -318,10 +353,8 @@ with tab1:
             price_range = st.slider("💰 Price range", 0, 100, (0, 100))
             min_price, max_price = price_range
 
-        # Extract selected genre
         selected_genre = genre.split(" (")[0] if genre != "All" else "All"
 
-        # 🚀 ULTRA-FAST FILTERING
         filtered = books_data.copy()
 
         if search:
@@ -338,13 +371,11 @@ with tab1:
         st.metric("📚", len(filtered), f"of {len(books_data)} books")
 
         if filtered:
-            # 🚀 SHOW FIRST 24 BOOKS INSTANTLY
             display_limit = 24
             cols = st.columns(4)
 
             for i, book in enumerate(filtered[:display_limit]):
                 with cols[i % 4]:
-                    # ⚡ CACHED IMAGES
                     cached_img = load_single_image(book.get("image_url"))
                     if cached_img:
                         st.image(cached_img, width=180)
@@ -364,7 +395,6 @@ with tab1:
 
                     st.markdown("─" * 20)
 
-            # Show more info
             if len(filtered) > display_limit:
                 st.info(f"🚀 Showing first {display_limit} books for speed. "
                         f"({len(filtered) - display_limit} more available - use filters!)")
@@ -408,12 +438,32 @@ with tab2:
     else:
         st.info("🛒 Your cart is empty. Browse books or ask the AI for recommendations!")
 
-# === CHAT TAB ===
+# === IMPROVED CHAT TAB WITH ANIMATION ===
 with tab3:
     st.header("💬 BookSnap AI")
 
+    # Add custom CSS to keep input at bottom
+    st.markdown("""
+        <style>
+        .stChatFloatingInputContainer {
+            position: sticky !important;
+            bottom: 0 !important;
+            z-index: 1000;
+            background: var(--background-color);
+            padding: 1rem 0;
+        }
+
+        /* Add padding to chat container to prevent overlap */
+        section[data-testid="stChatMessageContainer"] {
+            padding-bottom: 100px !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Display existing chat history
     for idx, message in enumerate(st.session_state.chat_history):
-        with st.chat_message(message["role"]):
+        avatar = USER_AVATAR if message["role"] == "user" else ASSISTANT_AVATAR
+        with st.chat_message(message["role"], avatar=avatar):
             content = str(message.get("content", ""))
             st.markdown(content)
 
@@ -421,42 +471,29 @@ with tab3:
             if books:
                 display_book_cards_in_chat(books, idx)
 
-    if "waiting_for_response" not in st.session_state:
-        st.session_state.waiting_for_response = False
+    # Input MUST be defined outside any conditional - always rendered
+    prompt = st.chat_input("Ask about books...")
 
-    if st.session_state.waiting_for_response:
-        with st.chat_message("assistant"):
-            with st.spinner("🤖 BookSnap AI is finding perfect recommendations..."):
-                st.markdown("**Thinking...** 💭")
-                st.markdown("I'm searching our catalog for the best books for you!")
-
-    if prompt := st.chat_input("Ask about books..."):
-        st.session_state.waiting_for_response = True
+    # Handle the prompt if it exists
+    if prompt:
+        # Add user message immediately
         st.session_state.chat_history.append({"role": "user", "content": prompt})
 
-        with st.chat_message("user"):
-            st.markdown(prompt)
+        # Get response from backend
+        with st.spinner("🤖 BookSnap AI is thinking..."):
+            response_data = chat_with_backend_api(
+                prompt,
+                st.session_state.chat_history[:-1],  # Exclude the just-added user message
+                st.session_state.cart
+            )
 
-        with st.chat_message("assistant"):
-            with st.spinner("🤖 BookSnap AI is finding perfect recommendations..."):
-                response_data = chat_with_backend_api(
-                    prompt,
-                    st.session_state.chat_history[:-1],
-                    st.session_state.cart
-                )
-
-            st.markdown(response_data["response"])
-
-            books = response_data.get("books", [])
-            if books:
-                display_book_cards_in_chat(books, len(st.session_state.chat_history))
-
+        # Save assistant response to history
         st.session_state.chat_history.append({
             "role": "assistant",
             "content": str(response_data["response"]),
             "books": response_data.get("books", [])
         })
-        st.session_state.waiting_for_response = False
+
         st.rerun()
 
 # Footer
