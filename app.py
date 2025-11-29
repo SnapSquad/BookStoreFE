@@ -127,6 +127,8 @@ if "cart" not in st.session_state:
     st.session_state.cart = []
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+if "scroll_trigger" not in st.session_state:
+    st.session_state.scroll_trigger = 0
 
 
 def add_book_to_cart(book_info):
@@ -307,12 +309,13 @@ def display_book_cards_in_chat(books, message_index):
 
 
 # === MAIN APP ===
-col1, col2 = st.columns([3, 1])
+col1, col2, col3 = st.columns([3, 1, 1])
 with col1:
     st.title("📚 BookVerse")
     st.markdown("**AI-Powered Book Shop**")
 with col2:
     st.metric("📖 Books", len(books_data))
+with col3:
     st.metric("🛒 Cart", sum(item.get("quantity", 0) for item in st.session_state.cart))
 
 # Sidebar
@@ -457,8 +460,61 @@ with tab3:
         section[data-testid="stChatMessageContainer"] {
             padding-bottom: 100px !important;
         }
+
+        /* Smooth scrolling */
+        section[data-testid="stChatMessageContainer"] {
+            scroll-behavior: smooth;
+        }
         </style>
     """, unsafe_allow_html=True)
+
+    # JavaScript to force scroll to bottom - triggered by state change
+    scroll_script = f"""
+        <script>
+        (function() {{
+            const scrollTrigger = {st.session_state.scroll_trigger};
+
+            function forceScrollToBottom() {{
+                // Try multiple methods to ensure scrolling works
+                const methods = [
+                    () => {{
+                        const container = window.parent.document.querySelector('[data-testid="stChatMessageContainer"]');
+                        if (container) {{
+                            container.scrollTop = container.scrollHeight + 1000;
+                        }}
+                    }},
+                    () => {{
+                        const endMarker = window.parent.document.getElementById('chat-end-anchor');
+                        if (endMarker) {{
+                            endMarker.scrollIntoView({{ behavior: 'auto', block: 'end' }});
+                        }}
+                    }},
+                    () => {{
+                        const allMessages = window.parent.document.querySelectorAll('[data-testid="stChatMessage"]');
+                        if (allMessages.length > 0) {{
+                            const lastMessage = allMessages[allMessages.length - 1];
+                            lastMessage.scrollIntoView({{ behavior: 'auto', block: 'end' }});
+                        }}
+                    }}
+                ];
+
+                methods.forEach(method => {{
+                    try {{ method(); }} catch(e) {{ console.log(e); }}
+                }});
+            }}
+
+            // Execute immediately and with delays
+            forceScrollToBottom();
+            setTimeout(forceScrollToBottom, 50);
+            setTimeout(forceScrollToBottom, 150);
+            setTimeout(forceScrollToBottom, 300);
+            setTimeout(forceScrollToBottom, 600);
+            setTimeout(forceScrollToBottom, 1000);
+            setTimeout(forceScrollToBottom, 2000);
+        }})();
+        </script>
+    """
+    st.components.v1.html(scroll_script, height=0)
 
     # Display existing chat history
     for idx, message in enumerate(st.session_state.chat_history):
@@ -470,6 +526,9 @@ with tab3:
             books = message.get("books", [])
             if books:
                 display_book_cards_in_chat(books, idx)
+
+    # Add anchor point at the very end for scrolling
+    st.markdown('<div id="chat-end-anchor" style="height: 1px;"></div>', unsafe_allow_html=True)
 
     # Input MUST be defined outside any conditional - always rendered
     prompt = st.chat_input("Ask about books...")
@@ -494,6 +553,10 @@ with tab3:
             "books": response_data.get("books", [])
         })
 
+        # Increment scroll trigger to force scroll on next render
+        st.session_state.scroll_trigger += 1
+
+        # Force rerun to display new messages and auto-scroll
         st.rerun()
 
 # Footer
