@@ -1,66 +1,97 @@
 import streamlit as st
+import requests
 import pandas as pd
 from PIL import Image
 from io import BytesIO
-import requests
-from datetime import datetime
+import json
+import uuid
 
 # === CONFIG ===
-st.set_page_config(page_title="BookVerse - Your AI Book Shop", layout="wide")
+st.set_page_config(
+    page_title="BookVerse - AI Book Shop",
+    page_icon="📚",
+    layout="wide"
+)
 
+# API Configurations
+BOOKS_API_URL = "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/IWConnect/Hackathon/RetriveAllBooksTask"
+BOOKS_API_TOKEN = "eNBKWJ5rIaphA2tRzQVacKRCU4BJwjHQ"
+CHAT_API_URL = "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/IWConnect/Hackathon/BookAgentDriverTask"
+CHAT_API_TOKEN = "ckzEfqVw93EyQNzvazLZWa1vOcvNtZGn"
+
+
+# === FETCH BOOKS FROM API ===
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def fetch_books_from_api():
+    try:
+        headers = {
+            "Authorization": f"Bearer {BOOKS_API_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        response = requests.get(BOOKS_API_URL, headers=headers, timeout=30)
+
+        if response.status_code == 200:
+            data = response.json()
+            # Assume API returns list of books or {"books": [...]}
+            if isinstance(data, list):
+                books = data
+            elif isinstance(data, dict) and "books" in data:
+                books = data["books"]
+            else:
+                books = []
+
+            # Convert to consistent format if needed
+            formatted_books = []
+            for book in books:
+                if isinstance(book, dict):
+                    formatted_books.append({
+                        "id": book.get("id", len(formatted_books) + 1),
+                        "title": book.get("title", "Unknown Title"),
+                        "author": book.get("author", "Unknown Author"),
+                        "genre": book.get("genre", "Unknown"),
+                        "price": book.get("price", 0.0),
+                        "image_url": book.get("image_url", "")
+                    })
+
+            st.success(f"✅ Loaded {len(formatted_books)} books from API!")
+            return formatted_books
+        else:
+            st.warning(f"⚠️ API returned status {response.status_code}. Using sample data.")
+            return []  # Or load sample data
+    except Exception as e:
+        st.error(f"❌ Failed to fetch books: {str(e)}. Using sample data.")
+        return []  # Fallback to empty or sample
+
+
+# === FALLBACK SAMPLE DATA ===
+SAMPLE_BOOKS = [
+    {"id": 1, "title": "The Midnight Library", "author": "Matt Haig", "genre": "Fiction", "price": 18.99,
+     "image_url": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=300"},
+    {"id": 2, "title": "Dune", "author": "Frank Herbert", "genre": "Science Fiction", "price": 22.50,
+     "image_url": "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=300"},
+    {"id": 3, "title": "Atomic Habits", "author": "James Clear", "genre": "Self-Help", "price": 16.99,
+     "image_url": "https://images.unsplash.com/photo-1589829085413-56de8ae18c73?w=300"},
+    {"id": 4, "title": "Sapiens", "author": "Yuval Noah Harari", "genre": "History", "price": 19.99,
+     "image_url": "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=300"},
+    {"id": 5, "title": "Project Hail Mary", "author": "Andy Weir", "genre": "Science Fiction", "price": 20.00,
+     "image_url": "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=300"},
+    {"id": 6, "title": "Klara and the Sun", "author": "Kazuo Ishiguro", "genre": "Literary Fiction", "price": 21.50,
+     "image_url": "https://images.unsplash.com/photo-1491841573334-9bde9f1709a0?w=300"},
+    {"id": 7, "title": "The Psychology of Money", "author": "Morgan Housel", "genre": "Finance", "price": 17.99,
+     "image_url": "https://images.unsplash.com/photo-1544716278-ca5e3f3abd8c?w=300"},
+    {"id": 8, "title": "Educated", "author": "Tara Westover", "genre": "Memoir", "price": 18.99,
+     "image_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300"},
+    {"id": 9, "title": "1984", "author": "George Orwell", "genre": "Dystopian", "price": 12.99,
+     "image_url": "https://images.unsplash.com/photo-1530538987395-7f02970410e0?w=300"},
+    {"id": 10, "title": "The Alchemist", "author": "Paulo Coelho", "genre": "Fiction", "price": 14.99,
+     "image_url": "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=300"}
+]
 
 # Load books
-@st.cache_data
-def load_books():
-    # This creates the DataFrame directly in code
-    data = {
-        "title": [
-            "The Midnight Library", "Dune", "Atomic Habits", "Sapiens",
-            "Project Hail Mary", "Klara and the Sun", "The Psychology of Money",
-            "Educated", "1984", "The Alchemist"
-        ],
-        "author": [
-            "Matt Haig", "Frank Herbert", "James Clear", "Yuval Noah Harari",
-            "Andy Weir", "Kazuo Ishiguro", "Morgan Housel",
-            "Tara Westover", "George Orwell", "Paulo Coelho"
-        ],
-        "genre": [
-            "Fiction", "Science Fiction", "Self-Help", "History",
-            "Science Fiction", "Literary Fiction", "Finance",
-            "Memoir", "Dystopian", "Fiction"
-        ],
-        "price": [18.99, 22.50, 16.99, 19.99, 20.00, 21.50, 17.99, 18.99, 12.99, 14.99],
-        "description": [
-            "A dazzling novel about all the choices that go into a life well lived.",
-            "Epic science fiction saga on the desert planet Arrakis.",
-            "Tiny changes, remarkable results: An easy & proven way to build good habits.",
-            "A brief history of humankind – where we came from and how we got here.",
-            "A lone astronaut must save the earth in this thrilling sci-fi adventure.",
-            "A thrilling book that offers a look at our changing world through the eyes of an AI.",
-            "Timeless lessons on wealth, greed, and happiness.",
-            "A memoir about a woman who leaves her survivalist family and goes on to earn a PhD.",
-            "A dystopian social science fiction novel about totalitarianism and surveillance.",
-            "A magical story about dreams, omens, and finding your personal legend."
-        ],
-        "image_url": [
-            "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400",
-            "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=400",
-            "https://images.unsplash.com/photo-1589829085413-56de8ae18c73?w=400",
-            "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400",
-            "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400",
-            "https://images.unsplash.com/photo-1491841573334-9bde9f1709a0?w=400",
-            "https://images.unsplash.com/photo-1544716278-ca5e3f3abd8c?w=400",
-            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400",
-            "https://images.unsplash.com/photo-1530538987395-7f02970410e0?w=400",
-            "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400"
-        ]
-    }
-    return pd.DataFrame(data)
-
-# Load books (this will work immediately)
-books = load_books()
-
-
+books_data = fetch_books_from_api()
+if not books_data:
+    books_data = SAMPLE_BOOKS
+    st.info("📚 Using sample data. API fetch failed.")
 
 # Initialize session state
 if "cart" not in st.session_state:
@@ -69,161 +100,310 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 
-# === CHATBOT LOGIC ===
-def chatbot_response(user_input):
-    user_input = user_input.lower()
-    history = st.session_state.chat_history
+# === Add book to cart function ===
+def add_book_to_cart(book_info):
+    title = book_info.get('title', 'Unknown Book')
+    book_id = book_info.get('id')
 
-    # Greetings
-    if any(g in user_input for g in ["hi", "hello", "hey", "good morning"]):
-        return "Hello! Welcome to BookVerse 📚 How can I help you find your next great read?"
+    # Check if book already exists in cart
+    for item in st.session_state.cart:
+        if item.get("original_id") == book_id or (item.get("title") == title and item.get("original_id") is None):
+            item["quantity"] += 1
+            return f"✅ Added another **{title}** to cart! (Qty: {item['quantity']})"
 
-    # Search by title/author
-    if "book called" in user_input or "by" in user_input or "find" in user_input:
-        for _, book in books.iterrows():
-            if book["title"].lower() in user_input or book["author"].lower() in user_input:
-                return f"Found it! ✨\n**{book['title']}** by {book['author']}\nPrice: ${book['price']}\nGenre: {book['genre']}\n\n{book['description']}"
-
-    # Genre recommendations
-    genre_keywords = {
-        "science fiction": "Science Fiction",
-        "scifi": "Science Fiction",
-        "fiction": "Fiction",
-        "self-help": "Self-Help",
-        "history": "History",
-        "literary": "Literary Fiction",
-        "novel": "Fiction"
+    # Add new book
+    new_item = {
+        "id": f"{book_id}_{uuid.uuid4().hex[:8]}" if book_id else f"chat_{uuid.uuid4().hex[:8]}",
+        "original_id": book_id,
+        "title": title,
+        "author": book_info.get('author', 'Unknown Author'),
+        "price": book_info.get('price', 0.0),
+        "quantity": 1,
+        "image_url": book_info.get('image_url', ''),
+        "genre": book_info.get('genre', 'Unknown')
     }
-    for key, genre in genre_keywords.items():
-        if key in user_input:
-            matches = books[books["genre"] == genre].head(3)
-            if not matches.empty:
-                recs = "\n".join(
-                    [f"• **{row['title']}** by {row['author']} - ${row['price']}" for _, row in matches.iterrows()])
-                return f"Here are some great {genre} books:\n{recs}"
+
+    st.session_state.cart.append(new_item)
+    return f"✅ **{title}** added to cart!"
+
+
+# === API CALL ===
+def chat_with_backend_api(current_message: str, chat_history: list, cart: list):
+    try:
+        headers = {
+            "Authorization": f"Bearer {CHAT_API_TOKEN}",
+            "Content-Type": "application/json"
+        }
+
+        messages_array = []
+        for i in range(0, len(chat_history), 2):
+            if i < len(chat_history):
+                messages_array.append({"role": "user", "content": chat_history[i]["content"]})
+            if i + 1 < len(chat_history):
+                messages_array.append({"role": "assistant", "content": chat_history[i + 1]["content"]})
+
+        messages_array.append({"role": "user", "content": current_message})
+
+        payload = {
+            "messages": messages_array,
+            "cart": [{"title": item["title"], "quantity": item.get("quantity", 1)} for item in cart]
+        }
+
+        response = requests.post(CHAT_API_URL, headers=headers, json=payload, timeout=30)
+
+        if response.status_code != 200:
+            return {
+                "response": "I'm having trouble connecting. Let me show you some great books! 📚",
+                "books": [books_data[0], books_data[1]]
+            }
+
+        data = response.json()
+        response_text = "I'm here to help you find great books!"
+        books_list = []
+
+        # Handle nested structure
+        if isinstance(data, list) and len(data) > 0:
+            first_item = data[0]
+            if isinstance(first_item, dict) and "response" in first_item:
+                nested_response = first_item["response"]
+                if isinstance(nested_response, dict):
+                    response_text = nested_response.get("response", response_text)
+                    books_list = nested_response.get("books", [])
+                else:
+                    response_text = str(nested_response)
+            elif isinstance(first_item, dict):
+                response_text = first_item.get("response", response_text)
+                books_list = first_item.get("books", [])
+
+        elif isinstance(data, dict):
+            if "response" in data:
+                nested_response = data["response"]
+                if isinstance(nested_response, dict):
+                    response_text = nested_response.get("response", response_text)
+                    books_list = nested_response.get("books", [])
+                else:
+                    response_text = str(nested_response)
             else:
-                return f"Sorry, no {genre} books in stock right now."
+                response_text = data.get("response", response_text)
+                books_list = data.get("books", [])
 
-    # Cart questions
-    if "cart" in user_input or "basket" in user_input:
-        if st.session_state.cart:
-            total = sum(item["price"] * item["qty"] for item in st.session_state.cart)
-            items = "\n".join(
-                [f"• {item['qty']} × {item['title']} (${item['price']})" for item in st.session_state.cart])
-            return f"Your cart has:\n{items}\n\n**Total: ${total:.2f}**"
-        else:
-            return "Your cart is empty. Want some recommendations?"
+        response_text = str(response_text)
 
-    # Default responses
-    if "recommend" in user_input or "suggest" in user_input:
-        top = books.sample(3)
-        recs = "\n".join([f"• **{row['title']}** by {row['author']} - ${row['price']}" for _, row in top.iterrows()])
-        return f"Here are some popular picks right now:\n{recs}"
+        return {
+            "response": response_text,
+            "books": books_list
+        }
 
-    return "I'm here to help you find books! Try asking: 'Recommend science fiction' or 'Find Dune' or 'What's in my cart?'"
+    except Exception:
+        return {
+            "response": "I'm having a moment! 😅 Let me recommend some amazing books:",
+            "books": [books_data[0], books_data[1]]
+        }
+
+
+# === Book cards in chat ===
+def display_book_cards_in_chat(books, message_index):
+    if not books:
+        return
+
+    st.markdown("**📚 Recommended Books:**")
+
+    for i, book_info in enumerate(books):
+        unique_key = f"chat_book_{message_index}_{i}_{book_info.get('id', i)}"
+
+        col1, col2 = st.columns([1, 4])
+
+        with col1:
+            image_url = book_info.get('image_url', '')
+            try:
+                if image_url:
+                    img = Image.open(BytesIO(requests.get(image_url, timeout=5).content))
+                    st.image(img, width=80)
+                else:
+                    st.image(Image.new('RGB', (80, 120), color='#e5e7eb'), width=80)
+            except:
+                st.image(Image.new('RGB', (80, 120), color='#e5e7eb'), width=80)
+
+        with col2:
+            title = book_info.get('title', 'Unknown Book')
+            author = book_info.get('author', 'Unknown Author')
+            price = book_info.get('price')
+            genre = book_info.get('genre', 'Unknown')
+
+            st.markdown(f"**{title}**")
+            st.markdown(f"✍️ *{author}*")
+            if price:
+                st.markdown(f"💰 **${float(price):.2f}**")
+            st.caption(f"📂 {genre}")
+
+            if st.button("🛒 Add to Cart", key=unique_key, use_container_width=True):
+                success_message = add_book_to_cart(book_info)
+                st.success(success_message)
+                st.rerun()
+
+        st.markdown("─" * 60)
 
 
 # === MAIN APP ===
 col1, col2 = st.columns([3, 1])
-
 with col1:
-    st.title("📚 BookVerse - Your AI-Powered Book Shop")
-    st.caption("Discover your next favorite book with the help of our smart assistant")
-
+    st.title("📚 BookVerse")
+    st.markdown("**AI-Powered Book Shop**")
 with col2:
-    st.metric("Books in Stock", len(books))
-    st.metric("In Your Cart", len(st.session_state.cart))
+    st.metric("📖 Books", len(books_data))
+    st.metric("🛒 Cart", sum(item.get("quantity", 0) for item in st.session_state.cart))
 
-# Tabs
-tab1, tab2, tab3 = st.tabs(["Browse Books", "Shopping Cart", "Chat with Assistant"])
+# Sidebar
+with st.sidebar:
+    st.header("⚡ Quick Actions")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🗑️ Clear Cart", use_container_width=True):
+            st.session_state.cart = []
+            st.rerun()
+    with col2:
+        if st.button("💬 Clear Chat", use_container_width=True):
+            st.session_state.chat_history = []
+            st.rerun()
 
-# === TAB 1: Browse Books ===
+tab1, tab2, tab3 = st.tabs(["📚 Browse", "🛒 Cart", "💬 AI Assistant"])
+
+# === BROWSE TAB - DYNAMIC FROM API ===
 with tab1:
-    st.subheader("All Books")
-    cols = st.columns(4)
-    for idx, book in books.iterrows():
-        with cols[idx % 4]:
-            try:
-                response = requests.get(book["image_url"])
-                img = Image.open(BytesIO(response.content))
-            except:
-                img = Image.new('RGB', (200, 300), color=(200, 200, 200))
-                from PIL import ImageDraw
+    st.header("🔍 Browse Books")
 
-                d = ImageDraw.Draw(img)
-                d.text((10, 140), "No Image", fill=(0, 0, 0))
+    # Search and Filter
+    col1, col2, col3 = st.columns([3, 2, 2])
+    with col1:
+        search = st.text_input("🔍 Search by title or author...")
+    with col2:
+        genre = st.selectbox("📂 Filter by genre", ["All"] + sorted(set(b["genre"] for b in books_data)))
+    with col3:
+        price = st.slider("💰 Price range", 0, 50, (0, 50))
 
-            st.image(img, use_container_width=True)
-            st.subheader(book["title"], anchor=False)
-            st.caption(f"by {book['author']}")
-            st.write(f"**${book['price']}** • {book['genre']}")
+    # Filter books
+    filtered = books_data
+    if search:
+        filtered = [b for b in filtered if
+                    search.lower() in b["title"].lower() or search.lower() in b["author"].lower()]
+    if genre != "All":
+        filtered = [b for b in filtered if b["genre"] == genre]
+    filtered = [b for b in filtered if price[0] <= b["price"] <= price[1]]
 
-            if st.button(f"Add to Cart", key=f"add_{idx}"):
-                if book["title"] not in [item["title"] for item in st.session_state.cart]:
-                    st.session_state.cart.append({
-                        "title": book["title"],
-                        "author": book["author"],
-                        "price": book["price"],
-                        "qty": 1
-                    })
-                else:
-                    for item in st.session_state.cart:
-                        if item["title"] == book["title"]:
-                            item["qty"] += 1
-                st.success(f"Added {book['title']} to cart!")
-                st.rerun()
+    st.success(f"✅ Found {len(filtered)} books")
 
-# === TAB 2: Cart ===
+    if filtered:
+        cols = st.columns(4)
+        for i, book in enumerate(filtered):
+            with cols[i % 4]:
+                try:
+                    img = Image.open(BytesIO(requests.get(book["image_url"], timeout=3).content))
+                except:
+                    img = Image.new('RGB', (200, 280), color='#e5e7eb')
+
+                st.image(img, use_container_width=True)
+                st.markdown(f"**{book['title']}**")
+                st.caption(f"✍️ {book['author']} | 📂 {book['genre']}")
+                st.markdown(f"💰 **${book['price']}**")
+
+                if st.button("🛒 Add to Cart", key=f"browse_add_{book['id']}"):
+                    success_message = add_book_to_cart(book)
+                    st.success(success_message)
+                    st.rerun()
+    else:
+        st.info("No books found matching your criteria. Try adjusting filters!")
+
+# === CART TAB ===
 with tab2:
-    st.subheader("🛒 Your Shopping Cart")
+    st.header("🛒 Shopping Cart")
+
     if st.session_state.cart:
         total = 0
         for i, item in enumerate(st.session_state.cart):
-            colA, colB, colC, colD = st.columns([3, 1, 1, 1])
-            with colA:
-                st.write(f"**{item['title']}** by {item['author']}")
-            with colB:
-                st.write(f"${item['price']}")
-            with colC:
-                qty = st.number_input("Qty", min_value=1, value=item["qty"], key=f"qty_{i}")
-                item["qty"] = qty
-            with colD:
-                if st.button("Remove", key=f"rem_{i}"):
+            col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+            with col1:
+                st.markdown(f"**{item['title']}**")
+                st.caption(item['author'])
+            with col2:
+                st.markdown(f"${item['price']}")
+            with col3:
+                qty = st.number_input("Qty", min_value=1, value=item["quantity"], key=f"qty_{i}")
+                if qty != item["quantity"]:
+                    item["quantity"] = qty
+                    st.rerun()
+            with col4:
+                if st.button("🗑️", key=f"del_{i}"):
                     st.session_state.cart.pop(i)
                     st.rerun()
-            total += item["price"] * item["qty"]
+            total += item["price"] * item["quantity"]
 
         st.divider()
-        st.write(f"**Total: ${total:.2f}**")
-        if st.button("Proceed to Checkout 💳", type="primary", use_container_width=True):
-            st.success("Checkout successful! (This is a demo)")
-            st.balloons()
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.markdown(f"### **Total: ${total:.2f}**")
+        with col2:
+            if st.button("💳 Checkout", type="primary", use_container_width=True):
+                st.success("🎉 Order placed successfully! Thank you for shopping at BookVerse! 📦")
+                st.balloons()
+                st.session_state.cart = []
+                st.rerun()
     else:
-        st.info("Your cart is empty. Start shopping!")
+        st.info("🛒 Your cart is empty. Ask the AI for recommendations or browse books!")
 
-# === TAB 3: Chat Assistant ===
+# === CHAT TAB ===
 with tab3:
-    st.subheader("💬 Ask Me Anything About Books!")
-    st.write("I can help you find books, recommend genres, check your cart, and more!")
+    st.header("💬 BookSnap AI")
 
     # Display chat history
-    for msg in st.session_state.chat_history:
-        if msg["role"] == "user":
-            st.chat_message("user").write(msg["content"])
-        else:
-            st.chat_message("assistant").write(msg["content"])
+    for idx, message in enumerate(st.session_state.chat_history):
+        with st.chat_message(message["role"]):
+            content = str(message.get("content", ""))
+            st.markdown(content)
+
+            # Display books
+            books = message.get("books", [])
+            if books:
+                display_book_cards_in_chat(books, idx)
 
     # Chat input
-    if prompt := st.chat_input("Type your message... (e.g. 'Recommend sci-fi books' or 'Find Atomic Habits')"):
-        st.session_state.chat_history.append({"role": "user", "content": prompt, "time": datetime.now()})
-        st.chat_message("user").write(prompt)
+    if prompt := st.chat_input("Ask about books..."):
+        # Add user message
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
 
-        response = chatbot_response(prompt)
-        st.session_state.chat_history.append({"role": "assistant", "content": response, "time": datetime.now()})
-        st.chat_message("assistant").write(response)
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Get AI response
+        with st.chat_message("assistant"):
+            with st.spinner("🤖 BookSnap AI is finding perfect recommendations..."):
+                response_data = chat_with_backend_api(
+                    prompt,
+                    st.session_state.chat_history[:-1],
+                    st.session_state.cart
+                )
+
+            st.markdown(response_data["response"])
+
+            books = response_data.get("books", [])
+            if books:
+                display_book_cards_in_chat(books, len(st.session_state.chat_history))
+
+        # Store response
+        st.session_state.chat_history.append({
+            "role": "assistant",
+            "content": str(response_data["response"]),
+            "books": response_data.get("books", [])
+        })
 
         st.rerun()
 
 # Footer
 st.markdown("---")
-st.caption("BookVerse • Built with ❤️ using Streamlit • Demo Book Shop with AI Assistant")
+st.markdown(
+    """
+    <div style='text-align: center; color: #6b7280; padding: 1rem;'>
+        📚 **BookVerse** • Powered by BookSnap AI • Dynamic Books from API
+    </div>
+    """,
+    unsafe_allow_html=True
+)
