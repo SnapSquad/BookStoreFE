@@ -1,0 +1,76 @@
+{
+  "gjorgeargirov": {
+    "username": "gjorgeargirov",
+    "email": "gjorge.argirov@iwconnect.com",
+    "password_hash": "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
+    "preferences": {
+      "favorite_genres": [
+        "Science Fiction"
+      ],
+      "price_range": [
+        0,
+        100
+      ],
+      "notifications": true
+    },
+    "wishlist": [
+      {
+        "id": 3,
+        "title": "The Four Loves",
+        "author": "Clive Staples Lewis",
+        "price": 125.11,
+        "image_url": "http://books.google.com/books/content?id=XhQ5XsFcpGIC&printsec=frontcover&img=1&zoom=1&source=gbs_api",
+        "genre": "Romance",
+        "added_at": "2025-11-29T19:24:00.207002"
+      }
+    ],
+    "order_history": [
+      {
+        "order_id": "51930353-6818-43b7-9917-ef50d75346eb",
+        "items": [
+          {
+            "id": "2_dbff64f8",
+            "original_id": 2,
+            "title": "The One Tree",
+            "author": "Stephen R. Donaldson",
+            "price": 121.16,
+            "quantity": 1,
+            "image_url": "http://books.google.com/books/content?id=OmQawwEACAAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api",
+            "genre": "Fiction"
+          },
+          {
+            "id": "3_bedc1401",
+            "original_id": 3,
+            "title": "The Four Loves",
+            "author": "Clive Staples Lewis",
+            "price": 125.11,
+            "quantity": 1,
+            "image_url": "http://books.google.com/books/content?id=XhQ5XsFcpGIC&printsec=frontcover&img=1&zoom=1&source=gbs_api",
+            "genre": "Romance"
+          }
+        ],
+        "total": 246.26999999999998,
+        "date": "2025-11-29T19:24:19.702336"
+      },
+      {
+        "order_id": "eb0f0987-db57-453f-9519-22f74df9dea5",
+        "items": [
+          {
+            "id": "3_e1541411",
+            "original_id": 3,
+            "title": "The Four Loves",
+            "author": "Clive Staples Lewis",
+            "price": 125.11,
+            "quantity": 1,
+            "image_url": "http://books.google.com/books/content?id=XhQ5XsFcpGIC&printsec=frontcover&img=1&zoom=1&source=gbs_api",
+            "genre": "Romance"
+          }
+        ],
+        "total": 125.11,
+        "date": "2025-11-29T19:31:40.669951"
+      }
+    ],
+    "created_at": "2025-11-29T19:23:47.097269",
+    "chat_history": []
+  }
+}

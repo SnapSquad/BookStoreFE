@@ -6,6 +6,9 @@ from io import BytesIO
 import json
 import uuid
 import time
+import hashlib
+import os
+from datetime import datetime
 
 # === CONFIG ===
 st.set_page_config(
@@ -23,6 +26,9 @@ BOOKS_API_URL = "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFaste
 BOOKS_API_TOKEN = "eNBKWJ5rIaphA2tRzQVacKRCU4BJwjHQ"
 CHAT_API_URL = "https://eks-ultra.snaplogic-demo.com/api/1/rest/feed-master/queue/ConnectFasterInc/IWConnect/Hackathon/BookAgentDriver_Ultra"
 CHAT_API_TOKEN = "nnWP8mDzAw80OfTDgxyp5WPBSQXj2659"
+
+# User data storage file
+USER_DATA_FILE = "users_data.json"
 
 
 # === ULTRA-FAST 3-LAYER CACHING SYSTEM ===
@@ -122,6 +128,213 @@ def get_books():
 
 books_data, genre_list = get_books()
 
+# === AUTHENTICATION FUNCTIONS ===
+def hash_password(password):
+    """Hash password using SHA256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def load_users():
+    """Load user data from JSON file"""
+    if os.path.exists(USER_DATA_FILE):
+        try:
+            with open(USER_DATA_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_users(users_data):
+    """Save user data to JSON file"""
+    with open(USER_DATA_FILE, 'w') as f:
+        json.dump(users_data, f, indent=2)
+
+def register_user(username, email, password):
+    """Register a new user"""
+    users = load_users()
+    
+    if username in users:
+        return False, "Username already exists"
+    
+    if any(user.get("email") == email for user in users.values()):
+        return False, "Email already registered"
+    
+    users[username] = {
+        "username": username,
+        "email": email,
+        "password_hash": hash_password(password),
+        "preferences": {
+            "favorite_genres": [],
+            "price_range": [0, 100],
+            "notifications": True
+        },
+        "wishlist": [],
+        "order_history": [],
+        "chat_history": [],
+        "created_at": datetime.now().isoformat()
+    }
+    
+    save_users(users)
+    return True, "Registration successful!"
+
+def authenticate_user(username, password):
+    """Authenticate a user"""
+    users = load_users()
+    
+    if username not in users:
+        return False, None
+    
+    user = users[username]
+    if user["password_hash"] == hash_password(password):
+        return True, user
+    else:
+        return False, None
+
+def get_user_data(username):
+    """Get user data"""
+    users = load_users()
+    return users.get(username)
+
+def update_user_data(username, user_data):
+    """Update user data"""
+    users = load_users()
+    if username in users:
+        users[username].update(user_data)
+        save_users(users)
+
+def add_to_wishlist(username, book_info):
+    """Add book to user's wishlist"""
+    user_data = get_user_data(username)
+    if user_data:
+        wishlist = user_data.get("wishlist", [])
+        book_id = book_info.get('id')
+        
+        # Check if already in wishlist
+        if not any(item.get('id') == book_id for item in wishlist):
+            wishlist.append({
+                "id": book_id,
+                "title": book_info.get('title'),
+                "author": book_info.get('author'),
+                "price": book_info.get('price'),
+                "image_url": book_info.get('image_url'),
+                "genre": book_info.get('genre'),
+                "added_at": datetime.now().isoformat()
+            })
+            user_data["wishlist"] = wishlist
+            update_user_data(username, user_data)
+            return True
+    return False
+
+def remove_from_wishlist(username, book_id):
+    """Remove book from user's wishlist"""
+    user_data = get_user_data(username)
+    if user_data:
+        wishlist = user_data.get("wishlist", [])
+        user_data["wishlist"] = [item for item in wishlist if item.get('id') != book_id]
+        update_user_data(username, user_data)
+        return True
+    return False
+
+def save_order(username, cart_items, total):
+    """Save order to user's order history"""
+    user_data = get_user_data(username)
+    if user_data:
+        order_history = user_data.get("order_history", [])
+        order_history.append({
+            "order_id": str(uuid.uuid4()),
+            "items": cart_items.copy(),
+            "total": total,
+            "date": datetime.now().isoformat()
+        })
+        user_data["order_history"] = order_history
+        update_user_data(username, user_data)
+        return True
+    return False
+
+def save_chat_history(username, chat_history):
+    """Save chat history to user's data"""
+    user_data = get_user_data(username)
+    if user_data:
+        # Convert chat history to a serializable format
+        serializable_history = []
+        for msg in chat_history:
+            serializable_msg = {
+                "role": msg.get("role"),
+                "content": msg.get("content", ""),
+                "books": msg.get("books", []),
+                "timestamp": msg.get("timestamp", datetime.now().isoformat())
+            }
+            serializable_history.append(serializable_msg)
+        
+        user_data["chat_history"] = serializable_history
+        update_user_data(username, user_data)
+        return True
+    return False
+
+def load_chat_history(username):
+    """Load chat history from user's data"""
+    user_data = get_user_data(username)
+    if user_data:
+        return user_data.get("chat_history", [])
+    return []
+
+def get_personalized_recommendations(username, books_data):
+    """Get personalized book recommendations based on user preferences and history"""
+    user_data = get_user_data(username)
+    if not user_data:
+        return books_data[:12]  # Return first 12 books if not logged in
+    
+    preferences = user_data.get("preferences", {})
+    favorite_genres = preferences.get("favorite_genres", [])
+    order_history = user_data.get("order_history", [])
+    wishlist = user_data.get("wishlist", [])
+    
+    # Collect genres from order history
+    ordered_genres = []
+    for order in order_history:
+        for item in order.get("items", []):
+            if item.get("genre"):
+                ordered_genres.append(item["genre"])
+    
+    # Combine favorite genres and ordered genres
+    preferred_genres = list(set(favorite_genres + ordered_genres))
+    
+    # Score books based on preferences
+    scored_books = []
+    for book in books_data:
+        score = 0
+        genre = book.get("genre", "")
+        
+        # Boost score for preferred genres
+        if genre in preferred_genres:
+            score += 10
+        
+        # Boost score if in wishlist
+        if any(w.get('id') == book.get('id') for w in wishlist):
+            score += 5
+        
+        # Boost score for books from previously ordered authors
+        ordered_authors = []
+        for order in order_history:
+            for item in order.get("items", []):
+                if item.get("author"):
+                    ordered_authors.append(item["author"])
+        
+        if book.get("author") in ordered_authors:
+            score += 3
+        
+        scored_books.append((score, book))
+    
+    # Sort by score and return top recommendations
+    scored_books.sort(key=lambda x: x[0], reverse=True)
+    recommendations = [book for _, book in scored_books[:12]]
+    
+    # If we don't have enough recommendations, fill with other books
+    if len(recommendations) < 12:
+        remaining = [book for book in books_data if book not in recommendations]
+        recommendations.extend(remaining[:12 - len(recommendations)])
+    
+    return recommendations
+
 # === SESSION STATE ===
 if "cart" not in st.session_state:
     st.session_state.cart = []
@@ -129,6 +342,16 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "scroll_trigger" not in st.session_state:
     st.session_state.scroll_trigger = 0
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if "username" not in st.session_state:
+    st.session_state.username = None
+if "show_login" not in st.session_state:
+    st.session_state.show_login = False
+if "show_signup" not in st.session_state:
+    st.session_state.show_signup = False
+if "chat_loaded" not in st.session_state:
+    st.session_state.chat_loaded = False
 
 
 def add_book_to_cart(book_info):
@@ -183,9 +406,21 @@ def chat_with_backend_api(current_message: str, chat_history: list, cart: list):
             "content": current_message
         })
 
+        # Include user preferences if logged in
+        user_preferences = {}
+        if st.session_state.authenticated and st.session_state.username:
+            user_data = get_user_data(st.session_state.username)
+            if user_data:
+                user_preferences = {
+                    "favorite_genres": user_data.get("preferences", {}).get("favorite_genres", []),
+                    "order_history_count": len(user_data.get("order_history", [])),
+                    "wishlist_count": len(user_data.get("wishlist", []))
+                }
+        
         payload = {
             "messages": messages_array,
-            "cart": [{"title": item["title"], "quantity": item.get("quantity", 1)} for item in cart]
+            "cart": [{"title": item["title"], "quantity": item.get("quantity", 1)} for item in cart],
+            "user_preferences": user_preferences
         }
 
         # Debug: Print what we're sending
@@ -308,8 +543,97 @@ def display_book_cards_in_chat(books, message_index):
         st.markdown("─" * 60)
 
 
+# === AUTHENTICATION UI ===
+def show_login_form():
+    """Display login form"""
+    with st.form("login_form"):
+        st.subheader("🔐 Login")
+        username = st.text_input("Username", key="login_username")
+        password = st.text_input("Password", type="password", key="login_password")
+        col1, col2 = st.columns(2)
+        with col1:
+            login_submit = st.form_submit_button("Login", use_container_width=True)
+        with col2:
+            if st.form_submit_button("Sign Up", use_container_width=True):
+                st.session_state.show_login = False
+                st.session_state.show_signup = True
+                st.rerun()
+        
+        if login_submit:
+            if username and password:
+                success, user = authenticate_user(username, password)
+                if success:
+                    st.session_state.authenticated = True
+                    st.session_state.username = username
+                    st.session_state.show_login = False
+                    # Load saved chat history
+                    saved_chat = load_chat_history(username)
+                    if saved_chat:
+                        st.session_state.chat_history = saved_chat
+                    st.session_state.chat_loaded = True
+                    st.success(f"Welcome back, {username}! 👋")
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password")
+            else:
+                st.warning("Please enter both username and password")
+
+def show_signup_form():
+    """Display signup form"""
+    with st.form("signup_form"):
+        st.subheader("✨ Create Account")
+        username = st.text_input("Username", key="signup_username")
+        email = st.text_input("Email", key="signup_email")
+        password = st.text_input("Password", type="password", key="signup_password")
+        confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm")
+        col1, col2 = st.columns(2)
+        with col1:
+            signup_submit = st.form_submit_button("Sign Up", use_container_width=True)
+        with col2:
+            if st.form_submit_button("Back to Login", use_container_width=True):
+                st.session_state.show_signup = False
+                st.session_state.show_login = True
+                st.rerun()
+        
+        if signup_submit:
+            if not username or not email or not password:
+                st.warning("Please fill in all fields")
+            elif password != confirm_password:
+                st.error("Passwords do not match")
+            elif len(password) < 6:
+                st.warning("Password must be at least 6 characters")
+            else:
+                success, message = register_user(username, email, password)
+                if success:
+                    st.success(message)
+                    st.session_state.authenticated = True
+                    st.session_state.username = username
+                    st.session_state.show_signup = False
+                    # Initialize empty chat history for new user
+                    st.session_state.chat_history = []
+                    st.session_state.chat_loaded = True
+                    st.rerun()
+                else:
+                    st.error(message)
+
 # === MAIN APP ===
-col1, col2, col3 = st.columns([3, 1, 1])
+# Show login/signup if not authenticated
+if not st.session_state.authenticated:
+    if st.session_state.show_signup:
+        show_signup_form()
+    else:
+        show_login_form()
+    st.stop()
+
+# Load chat history if user is authenticated but chat hasn't been loaded yet
+if st.session_state.authenticated and st.session_state.username and not st.session_state.chat_loaded:
+    saved_chat = load_chat_history(st.session_state.username)
+    if saved_chat:
+        st.session_state.chat_history = saved_chat
+    st.session_state.chat_loaded = True
+
+# Main app header
+col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
 with col1:
     st.title("📚 BookVerse")
     st.markdown("**AI-Powered Book Shop**")
@@ -317,9 +641,25 @@ with col2:
     st.metric("📖 Books", len(books_data))
 with col3:
     st.metric("🛒 Cart", sum(item.get("quantity", 0) for item in st.session_state.cart))
+with col4:
+    user_data = get_user_data(st.session_state.username)
+    wishlist_count = len(user_data.get("wishlist", [])) if user_data else 0
+    st.metric("❤️ Wishlist", wishlist_count)
 
 # Sidebar
 with st.sidebar:
+    # User profile section
+    st.header(f"👤 {st.session_state.username}")
+    if st.button("🚪 Logout", use_container_width=True):
+        st.session_state.authenticated = False
+        st.session_state.username = None
+        st.session_state.cart = []
+        st.session_state.chat_history = []
+        st.session_state.chat_loaded = False
+        st.rerun()
+    
+    st.divider()
+    
     st.header("⚡ Quick Actions")
     col1, col2 = st.columns(2)
     with col1:
@@ -329,18 +669,81 @@ with st.sidebar:
     with col2:
         if st.button("💬 Clear Chat", use_container_width=True):
             st.session_state.chat_history = []
+            # Also clear saved chat history
+            if st.session_state.authenticated and st.session_state.username:
+                save_chat_history(st.session_state.username, [])
             st.rerun()
 
     st.divider()
     if st.button("🔄 Refresh Books", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+    
+    st.divider()
+    
+    # User preferences
+    st.header("⚙️ Preferences")
+    user_data = get_user_data(st.session_state.username)
+    if user_data:
+        preferences = user_data.get("preferences", {})
+        favorite_genres = preferences.get("favorite_genres", [])
+        
+        available_genres = [g.split(" (")[0] for g in genre_list if g != "All"]
+        selected_genres = st.multiselect(
+            "Favorite Genres",
+            available_genres,
+            default=favorite_genres
+        )
+        
+        if st.button("💾 Save Preferences", use_container_width=True):
+            preferences["favorite_genres"] = selected_genres
+            update_user_data(st.session_state.username, {"preferences": preferences})
+            st.success("Preferences saved!")
 
-tab1, tab2, tab3 = st.tabs(["📚 Browse", "🛒 Cart", "💬 AI Assistant"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📚 Browse", "🛒 Cart", "💬 AI Assistant", "❤️ Wishlist", "📋 Orders"])
 
 # === BROWSE TAB ===
 with tab1:
     st.header("🔍 Browse Books")
+    
+    # Show personalized recommendations if logged in
+    user_data = get_user_data(st.session_state.username)
+    if user_data:
+        st.subheader("✨ Personalized Recommendations")
+        recommendations = get_personalized_recommendations(st.session_state.username, books_data)
+        
+        if recommendations:
+            rec_cols = st.columns(4)
+            for i, book in enumerate(recommendations[:8]):
+                with rec_cols[i % 4]:
+                    cached_img = load_single_image(book.get("image_url"))
+                    if cached_img:
+                        st.image(cached_img, width=150)
+                    else:
+                        st.markdown("📖")
+                    
+                    st.markdown(f"**{book['title']}**")
+                    st.caption(f"✍️ {book['author']}")
+                    if book['price'] > 0:
+                        st.markdown(f"💰 **${book['price']:.2f}**")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("🛒", key=f"rec_cart_{book['id']}", use_container_width=True):
+                            add_book_to_cart(book)
+                            st.rerun()
+                    with col2:
+                        in_wishlist = any(w.get('id') == book.get('id') for w in user_data.get("wishlist", []))
+                        if in_wishlist:
+                            if st.button("❤️", key=f"rec_wish_rm_{book['id']}", use_container_width=True):
+                                remove_from_wishlist(st.session_state.username, book.get('id'))
+                                st.rerun()
+                        else:
+                            if st.button("🤍", key=f"rec_wish_add_{book['id']}", use_container_width=True):
+                                add_to_wishlist(st.session_state.username, book)
+                                st.rerun()
+        
+        st.divider()
 
     if not books_data:
         st.info("📚 No books available. Click 'Refresh Books' in sidebar to try again.")
@@ -391,10 +794,24 @@ with tab1:
                     if book['price'] > 0:
                         st.markdown(f"💰 **${book['price']:.2f}**")
 
-                    if st.button("🛒 Add", key=f"browse_add_{book['id']}", use_container_width=True):
-                        success_message = add_book_to_cart(book)
-                        st.success(success_message)
-                        st.rerun()
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("🛒 Add", key=f"browse_add_{book['id']}", use_container_width=True):
+                            success_message = add_book_to_cart(book)
+                            st.success(success_message)
+                            st.rerun()
+                    with col2:
+                        user_data = get_user_data(st.session_state.username)
+                        in_wishlist = any(w.get('id') == book.get('id') for w in user_data.get("wishlist", [])) if user_data else False
+                        if in_wishlist:
+                            if st.button("❤️", key=f"browse_wish_rm_{book['id']}", use_container_width=True):
+                                remove_from_wishlist(st.session_state.username, book.get('id'))
+                                st.rerun()
+                        else:
+                            if st.button("🤍", key=f"browse_wish_add_{book['id']}", use_container_width=True):
+                                add_to_wishlist(st.session_state.username, book)
+                                st.success(f"Added {book['title']} to wishlist!")
+                                st.rerun()
 
                     st.markdown("─" * 20)
 
@@ -434,6 +851,8 @@ with tab2:
             st.markdown(f"### **Total: ${total:.2f}**")
         with col2:
             if st.button("💳 Checkout", type="primary", use_container_width=True):
+                # Save order to user's order history
+                save_order(st.session_state.username, st.session_state.cart, total)
                 st.success("🎉 Order placed successfully! Thank you for shopping at BookVerse! 📦")
                 st.balloons()
                 st.session_state.cart = []
@@ -535,8 +954,12 @@ with tab3:
 
     # Handle the prompt if it exists
     if prompt:
-        # Add user message immediately
-        st.session_state.chat_history.append({"role": "user", "content": prompt})
+        # Add user message immediately with timestamp
+        st.session_state.chat_history.append({
+            "role": "user",
+            "content": prompt,
+            "timestamp": datetime.now().isoformat()
+        })
 
         # Get response from backend
         with st.spinner("🤖 BookSnap AI is thinking..."):
@@ -546,18 +969,93 @@ with tab3:
                 st.session_state.cart
             )
 
-        # Save assistant response to history
+        # Save assistant response to history with timestamp
         st.session_state.chat_history.append({
             "role": "assistant",
             "content": str(response_data["response"]),
-            "books": response_data.get("books", [])
+            "books": response_data.get("books", []),
+            "timestamp": datetime.now().isoformat()
         })
+
+        # Save chat history to user's data
+        if st.session_state.authenticated and st.session_state.username:
+            save_chat_history(st.session_state.username, st.session_state.chat_history)
 
         # Increment scroll trigger to force scroll on next render
         st.session_state.scroll_trigger += 1
 
         # Force rerun to display new messages and auto-scroll
         st.rerun()
+
+# === WISHLIST TAB ===
+with tab4:
+    st.header("❤️ My Wishlist")
+    
+    user_data = get_user_data(st.session_state.username)
+    wishlist = user_data.get("wishlist", []) if user_data else []
+    
+    if wishlist:
+        st.metric("📚", len(wishlist), "books in wishlist")
+        
+        cols = st.columns(4)
+        for i, item in enumerate(wishlist):
+            with cols[i % 4]:
+                cached_img = load_single_image(item.get("image_url"))
+                if cached_img:
+                    st.image(cached_img, width=180)
+                else:
+                    st.markdown("📖")
+                
+                st.markdown(f"**{item['title']}**")
+                st.caption(f"✍️ {item.get('author', 'Unknown')}")
+                st.caption(f"📂 {item.get('genre', 'Unknown')}")
+                if item.get('price', 0) > 0:
+                    st.markdown(f"💰 **${item['price']:.2f}**")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("🛒 Add to Cart", key=f"wish_cart_{item['id']}", use_container_width=True):
+                        add_book_to_cart(item)
+                        st.rerun()
+                with col2:
+                    if st.button("🗑️ Remove", key=f"wish_rm_{item['id']}", use_container_width=True):
+                        remove_from_wishlist(st.session_state.username, item['id'])
+                        st.success("Removed from wishlist!")
+                        st.rerun()
+                
+                st.markdown("─" * 20)
+    else:
+        st.info("❤️ Your wishlist is empty. Add books to your wishlist while browsing!")
+
+# === ORDER HISTORY TAB ===
+with tab5:
+    st.header("📋 Order History")
+    
+    user_data = get_user_data(st.session_state.username)
+    order_history = user_data.get("order_history", []) if user_data else []
+    
+    if order_history:
+        st.metric("📦", len(order_history), "orders")
+        
+        # Show orders in reverse chronological order (newest first)
+        for order in reversed(order_history):
+            with st.expander(f"📦 Order #{order['order_id'][:8]} - ${order['total']:.2f} - {order['date'][:10]}", expanded=False):
+                st.markdown(f"**Order Date:** {order['date']}")
+                st.markdown(f"**Total:** ${order['total']:.2f}")
+                st.markdown("**Items:**")
+                
+                for item in order.get("items", []):
+                    col1, col2, col3 = st.columns([3, 1, 1])
+                    with col1:
+                        st.markdown(f"• {item.get('title', 'Unknown')}")
+                    with col2:
+                        st.markdown(f"Qty: {item.get('quantity', 1)}")
+                    with col3:
+                        st.markdown(f"${item.get('price', 0) * item.get('quantity', 1):.2f}")
+                
+                st.divider()
+    else:
+        st.info("📋 No orders yet. Start shopping to see your order history here!")
 
 # Footer
 st.markdown("---")
