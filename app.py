@@ -149,7 +149,7 @@ def chat_with_backend_api(current_message: str, chat_history: list, cart: list):
             "cart": [{"title": item["title"], "quantity": item.get("quantity", 1)} for item in cart]
         }
 
-        response = requests.post(CHAT_API_URL, headers=headers, json=payload, timeout=30)
+        response = requests.post(CHAT_API_URL, headers=headers, json=payload)
 
         if response.status_code != 200:
             return {
