@@ -531,8 +531,13 @@ def display_book_cards_in_chat(books, message_index):
 
             st.markdown(f"**{title}**")
             st.markdown(f"✍️ *{author}*")
-            if price and price > 0:
-                st.markdown(f"💰 **${float(price):.2f}**")
+            # Safely convert price to float
+            try:
+                price_float = float(price) if price is not None else 0
+                if price_float > 0:
+                    st.markdown(f"💰 **${price_float:.2f}**")
+            except (ValueError, TypeError):
+                pass  # Skip price display if conversion fails
             st.caption(f"📂 {genre}")
 
             if st.button("🛒 Add to Cart", key=unique_key, use_container_width=True):
@@ -724,8 +729,12 @@ with tab1:
                     
                     st.markdown(f"**{book['title']}**")
                     st.caption(f"✍️ {book['author']}")
-                    if book['price'] > 0:
-                        st.markdown(f"💰 **${book['price']:.2f}**")
+                    try:
+                        price_val = float(book.get('price', 0))
+                        if price_val > 0:
+                            st.markdown(f"💰 **${price_val:.2f}**")
+                    except (ValueError, TypeError):
+                        pass
                     
                     col1, col2 = st.columns(2)
                     with col1:
@@ -791,8 +800,12 @@ with tab1:
                     st.markdown(f"**{book['title']}**")
                     st.caption(f"✍️ {book['author']}")
                     st.caption(f"📂 {book['genre']}")
-                    if book['price'] > 0:
-                        st.markdown(f"💰 **${book['price']:.2f}**")
+                    try:
+                        price_val = float(book.get('price', 0))
+                        if price_val > 0:
+                            st.markdown(f"💰 **${price_val:.2f}**")
+                    except (ValueError, TypeError):
+                        pass
 
                     col1, col2 = st.columns(2)
                     with col1:
@@ -1009,8 +1022,12 @@ with tab4:
                 st.markdown(f"**{item['title']}**")
                 st.caption(f"✍️ {item.get('author', 'Unknown')}")
                 st.caption(f"📂 {item.get('genre', 'Unknown')}")
-                if item.get('price', 0) > 0:
-                    st.markdown(f"💰 **${item['price']:.2f}**")
+                try:
+                    price_val = float(item.get('price', 0))
+                    if price_val > 0:
+                        st.markdown(f"💰 **${price_val:.2f}**")
+                except (ValueError, TypeError):
+                    pass
                 
                 col1, col2 = st.columns(2)
                 with col1:
