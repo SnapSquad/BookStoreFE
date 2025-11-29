@@ -380,54 +380,46 @@ def add_book_to_cart(book_info):
 
 # === FIXED CHAT API - PROPER MESSAGE HANDLING ===
 def chat_with_backend_api(current_message: str, chat_history: list, cart: list):
-    """
-    Fixed version that properly handles chat history
-    """
+   
     try:
         headers = {
             "Authorization": f"Bearer {CHAT_API_TOKEN}",
             "Content-Type": "application/json"
         }
 
-        # ✅ FIX: Properly build messages array from chat history
+        # Get user data if authenticated
+        user_data = None
+        if st.session_state.authenticated and st.session_state.username:
+            user_data = get_user_data(st.session_state.username)
+
+        # Build messages array from chat history
         messages_array = []
 
         # Add all previous messages in order (they already have correct roles)
         for msg in chat_history:
             # Only include user and assistant messages, skip the books data
+            user_email = user_data.get("email", "guest") if st.session_state.authenticated and user_data else "guest"
             messages_array.append({
                 "role": msg["role"],
-                "content": msg["content"]
+                "content": msg["content"],
+                "username": user_email if msg["role"] == "user" else "assistant"
             })
 
         # Add the current user message
+        user_email = user_data.get("email", "guest") if st.session_state.authenticated and user_data else "guest"
         messages_array.append({
             "role": "user",
-            "content": current_message
+            "content": current_message,
+            "username": user_email
         })
 
-        # Include user preferences if logged in
-        user_preferences = {}
-        if st.session_state.authenticated and st.session_state.username:
-            user_data = get_user_data(st.session_state.username)
-            if user_data:
-                user_preferences = {
-                    "favorite_genres": user_data.get("preferences", {}).get("favorite_genres", []),
-                    "order_history_count": len(user_data.get("order_history", [])),
-                    "wishlist_count": len(user_data.get("wishlist", []))
-                }
-        
         payload = {
             "messages": messages_array,
-            "cart": [{"title": item["title"], "quantity": item.get("quantity", 1)} for item in cart],
-            "user_preferences": user_preferences
+            "cart": [],
+            "email": user_data.get("email", "guest") if st.session_state.authenticated and user_data else "guest"
         }
 
-        # Debug: Print what we're sending
-        print(f"📤 Sending {len(messages_array)} messages to backend")
-        print(f"📤 Last 3 messages: {messages_array[-3:] if len(messages_array) >= 3 else messages_array}")
-
-        response = requests.post(CHAT_API_URL, headers=headers, json=payload, timeout=30)
+        response = requests.post(CHAT_API_URL, headers=headers, json=payload)
 
         if response.status_code != 200:
             print(f"❌ API Error: {response.status_code}")

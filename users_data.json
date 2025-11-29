@@ -1,11 +1,11 @@
 {
-  "gjorgeargirov": {
-    "username": "gjorgeargirov",
+  "gjorge": {
+    "username": "gjorge",
     "email": "gjorge.argirov@iwconnect.com",
     "password_hash": "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
     "preferences": {
       "favorite_genres": [
-        "Science Fiction"
+        "Mystery"
       ],
       "price_range": [
         0,
@@ -15,94 +15,17 @@
     },
     "wishlist": [
       {
-        "id": 3,
-        "title": "The Four Loves",
-        "author": "Clive Staples Lewis",
-        "price": 125.11,
-        "image_url": "http://books.google.com/books/content?id=XhQ5XsFcpGIC&printsec=frontcover&img=1&zoom=1&source=gbs_api",
-        "genre": "Romance",
-        "added_at": "2025-11-29T19:24:00.207002"
+        "id": 1,
+        "title": "Spider's Web",
+        "author": "Charles Osborne",
+        "price": 94.2,
+        "image_url": "http://books.google.com/books/content?id=gA5GPgAACAAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api",
+        "genre": "Fiction",
+        "added_at": "2025-11-29T23:18:27.092570"
       }
     ],
-    "order_history": [
-      {
-        "order_id": "51930353-6818-43b7-9917-ef50d75346eb",
-        "items": [
-          {
-            "id": "2_dbff64f8",
-            "original_id": 2,
-            "title": "The One Tree",
-            "author": "Stephen R. Donaldson",
-            "price": 121.16,
-            "quantity": 1,
-            "image_url": "http://books.google.com/books/content?id=OmQawwEACAAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api",
-            "genre": "Fiction"
-          },
-          {
-            "id": "3_bedc1401",
-            "original_id": 3,
-            "title": "The Four Loves",
-            "author": "Clive Staples Lewis",
-            "price": 125.11,
-            "quantity": 1,
-            "image_url": "http://books.google.com/books/content?id=XhQ5XsFcpGIC&printsec=frontcover&img=1&zoom=1&source=gbs_api",
-            "genre": "Romance"
-          }
-        ],
-        "total": 246.26999999999998,
-        "date": "2025-11-29T19:24:19.702336"
-      },
-      {
-        "order_id": "eb0f0987-db57-453f-9519-22f74df9dea5",
-        "items": [
-          {
-            "id": "3_e1541411",
-            "original_id": 3,
-            "title": "The Four Loves",
-            "author": "Clive Staples Lewis",
-            "price": 125.11,
-            "quantity": 1,
-            "image_url": "http://books.google.com/books/content?id=XhQ5XsFcpGIC&printsec=frontcover&img=1&zoom=1&source=gbs_api",
-            "genre": "Romance"
-          }
-        ],
-        "total": 125.11,
-        "date": "2025-11-29T19:31:40.669951"
-      }
-    ],
-    "created_at": "2025-11-29T19:23:47.097269",
-    "chat_history": [
-      {
-        "role": "user",
-        "content": "Give me science fiction books that involve space wars.",
-        "books": [],
-        "timestamp": "2025-11-29T19:44:54.196675"
-      },
-      {
-        "role": "assistant",
-        "content": "I found a couple of books that may interest you, though the search didn't return many classic space war titles. Here are the best matches:\n\n**Gravity** by Tess Gerritsen\n- Why this fits: A science fiction thriller set in space involving life-threatening conflict and tension in orbit\n- Key details: Science fiction genre\n- Price: $77.95\n\n**The Gap Into Madness** by Stephen R. Donaldson\n- Why this fits: Part of the Gap series, a space opera featuring interstellar conflict, political intrigue, and military confrontations\n- Key details: Science fiction featuring the character Morn Hyland in a complex space-based narrative\n- Price: $93.04\n\nI apologize that the search didn't return more traditional space war titles like classic military science fiction. If you're looking for books with large-scale space battles and military campaigns, you might want to try searching for specific authors like \"Alastair Reynolds,\" \"Peter F. Hamilton,\" or terms like \"military science fiction\" or \"space opera\" to get more targeted results.",
-        "books": [
-          {
-            "id": 29,
-            "title": "Gravity",
-            "author": "Tess Gerritsen",
-            "genre": "Science fiction",
-            "price": 77.95,
-            "image_url": "http://books.google.com/books/content?id=KI66cH39n6sC&printsec=frontcover&img=1&zoom=1&source=gbs_api",
-            "score": "0.318566322"
-          },
-          {
-            "id": 9,
-            "title": "The Gap Into Madness",
-            "author": "Stephen R. Donaldson",
-            "genre": "Hyland, Morn (Fictitious character)",
-            "price": 93.04,
-            "image_url": "http://books.google.com/books/content?id=4oXavLNDWocC&printsec=frontcover&img=1&zoom=1&source=gbs_api",
-            "score": "0.239472389"
-          }
-        ],
-        "timestamp": "2025-11-29T19:45:08.254675"
-      }
-    ]
+    "order_history": [],
+    "chat_history": [],
+    "created_at": "2025-11-29T22:10:08.518712"
   }
 }
